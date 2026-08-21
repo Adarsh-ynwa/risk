@@ -99,7 +99,7 @@ export function DashboardCharts({ summary }: { summary: RiskSummary }) {
               <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={10} tickFormatter={(d) => d.slice(5)} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} domain={[0, 100]} />
               <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-              <Line type="monotone" dataKey="avg_risk_score" stroke="#3b82f6" strokeWidth={2} dot={false} name="Avg Risk Score" />
+              <Line type="monotone" dataKey="avg_risk_score" stroke="#a78bfa" strokeWidth={2} dot={false} name="Avg Risk Score" />
             </LineChart>
           </ResponsiveContainer>
         </CardContent>
@@ -114,7 +114,7 @@ export function DashboardCharts({ summary }: { summary: RiskSummary }) {
               <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} />
               <YAxis type="category" dataKey="category" stroke="hsl(var(--muted-foreground))" fontSize={10} width={90} />
               <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }} />
-              <Bar dataKey="count" fill="#f97316" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

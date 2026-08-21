@@ -4,24 +4,24 @@
 
 @layer base {
   :root {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 9%;
-    --card-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 6%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 14%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
+    --background: 240 10% 4%;
+    --foreground: 240 10% 96%;
+    --card: 240 9% 7%;
+    --card-foreground: 240 10% 96%;
+    --primary: 263 72% 62%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 255 18% 14%;
+    --secondary-foreground: 240 10% 96%;
+    --muted: 240 7% 12%;
+    --muted-foreground: 245 8% 64%;
+    --accent: 263 22% 15%;
+    --accent-foreground: 240 10% 98%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 18%;
-    --input: 217 33% 18%;
-    --ring: 217 91% 60%;
-    --radius: 0.625rem;
+    --border: 250 12% 17%;
+    --input: 250 12% 19%;
+    --ring: 266 85% 68%;
+    --radius: 0.75rem;
   }
 }
 
@@ -31,5 +31,11 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+    background-image: radial-gradient(circle at 12% -10%, hsl(263 72% 62% / 0.08), transparent 32rem);
+    background-attachment: fixed;
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.35);
+    color: hsl(var(--foreground));
   }
 }

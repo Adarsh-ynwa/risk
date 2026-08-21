@@ -60,7 +60,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-card/50 lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border/70 bg-black/35 backdrop-blur-xl lg:flex">
         <div className="flex h-16 items-center gap-2 border-b border-border px-6">
           <ShieldAlert className="h-7 w-7 text-primary" />
           <div>
@@ -109,7 +109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex flex-1 flex-col min-w-0">
-        <header className="flex h-16 items-center justify-between gap-3 border-b border-border bg-card/30 px-4 lg:px-8">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border/70 bg-background/80 px-4 backdrop-blur-xl lg:px-8">
           <div className="flex items-center gap-3 min-w-0">
             <Button
               variant="ghost"
