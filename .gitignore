@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.env
+*.db
+
+# ML artifacts (keep metrics json, ignore large if needed)
+backend/data/*.csv
+
+# Node
+node_modules/
+.next/
+.env.local
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
