@@ -35,6 +35,8 @@ These are scenario assumptions, not measured merchant financials. Adjust the con
 
 See **[SETUP.md](./SETUP.md)** for full instructions including Kaggle dataset setup.
 
+For production deployment with Render, PostgreSQL, and Vercel, see **[DEPLOYMENT.md](./DEPLOYMENT.md)**.
+
 ### Windows (automated)
 
 ```powershell
