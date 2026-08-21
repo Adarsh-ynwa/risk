@@ -7,6 +7,8 @@ import {
   LayoutDashboard,
   ArrowLeftRight,
   BarChart3,
+  ClipboardList,
+  Gauge,
   Settings,
   ShieldAlert,
   Sparkles,
@@ -19,6 +21,8 @@ import { Button } from "@/components/ui/button";
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
+  { href: "/alerts", label: "Alert Queue", icon: ClipboardList },
+  { href: "/evaluation", label: "Evaluation", icon: Gauge },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -56,7 +60,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="hidden w-64 shrink-0 border-r border-border bg-card/50 lg:block">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-card/50 lg:flex">
         <div className="flex h-16 items-center gap-2 border-b border-border px-6">
           <ShieldAlert className="h-7 w-7 text-primary" />
           <div>
@@ -67,7 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <nav className="space-y-1 p-4">
           <NavLinks pathname={pathname} />
         </nav>
-        <div className="absolute bottom-4 left-4 right-4 hidden lg:block">
+        <div className="mt-auto p-4">
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200/80">
             Demo environment — no real payments are processed.
           </div>

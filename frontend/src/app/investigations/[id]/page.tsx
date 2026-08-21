@@ -5,13 +5,11 @@ import Link from "next/link";
 import { Bot, CheckCircle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RiskBadge } from "@/components/dashboard/kpi-card";
-import { ToolCallsPanel } from "@/components/investigations/tool-calls-panel";
 import { api, type InvestigationReport } from "@/lib/api";
 
 export default function InvestigationPage({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState("");
   const [investigation, setInvestigation] = useState<InvestigationReport | null>(null);
-  const [isFallback, setIsFallback] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,7 +21,6 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
     api.getInvestigation(id)
       .then((r) => {
         setInvestigation(r.investigation);
-        setIsFallback(r.is_fallback);
       })
       .catch(() => setInvestigation(null))
       .finally(() => setLoading(false));
@@ -101,7 +98,6 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
         </CardContent>
       </Card>
 
-      <ToolCallsPanel toolCalls={investigation.tool_calls} isFallback={isFallback} />
     </div>
   );
 }

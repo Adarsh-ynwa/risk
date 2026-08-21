@@ -1,4 +1,4 @@
-"""AI Risk Investigator with Gemini function-calling agent loop."""
+"""AI risk investigator with Groq tool calling and a deterministic fallback."""
 
 import json
 import logging
@@ -30,9 +30,9 @@ Return ONLY valid JSON matching this schema:
 
 MAX_TOOL_ROUNDS = 6
 
-# The Gemini SDK receives this schema as a JSON response contract; the response
-# is still validated with the Pydantic model before it reaches the API.
-GEMINI_RESPONSE_SCHEMA = {
+# JSON response contract for Groq-backed investigations. Responses are still
+# validated with the Pydantic model before they reach the API.
+GROQ_RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
         "risk_level": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]},
@@ -64,7 +64,7 @@ def _build_fallback_report(
     evidence: dict[str, Any],
     tool_calls: list[ToolCallRecord],
 ) -> InvestigationReport:
-    """Generate investigation from rules when Gemini is unavailable."""
+    """Generate an investigation from rules when Groq is unavailable."""
     assessment = evidence.get("risk_assessment") or {}
     triggered = assessment.get("triggered_rules", [])
     risk_score = assessment.get("final_risk_score", 50)
@@ -96,7 +96,7 @@ def _build_fallback_report(
         summary=(
             f"Rule-based fallback investigation for transaction with risk score {risk_score:.0f}/100. "
             f"{len(triggered)} risk rules triggered. {len(tool_calls)} investigation tools executed. "
-            f"Gemini API unavailable — using deterministic analysis."
+            f"Groq API unavailable — using deterministic analysis."
         ),
         primary_risk_factors=factors[:5],
         investigation_findings=findings[:5] or ["No additional findings from rule engine."],
@@ -113,13 +113,14 @@ def _run_fallback_agent(
     customer_id: str,
     risk_assessment: dict[str, Any],
 ) -> tuple[InvestigationReport, bool]:
-    """Execute all tools sequentially when Gemini is unavailable."""
+    """Execute all tools sequentially when Groq is unavailable."""
     tool_calls: list[ToolCallRecord] = []
     evidence: dict[str, Any] = {"risk_assessment": risk_assessment}
 
     planned = [
         ("get_transaction_context", {"transaction_id": transaction_id}, "Retrieve full transaction context"),
         ("get_customer_profile", {"customer_id": customer_id}, "Review customer profile and account history"),
+        ("get_customer_behavior", {"transaction_id": transaction_id}, "Compare this payment with earlier customer behavior"),
         ("get_customer_transaction_history", {"customer_id": customer_id, "limit": 10}, "Analyze recent spending patterns"),
         ("get_customer_risk_history", {"customer_id": customer_id, "limit": 10}, "Check prior risk assessments"),
         ("get_similar_transactions", {"transaction_id": transaction_id, "limit": 5}, "Compare with similar transactions"),
@@ -128,6 +129,7 @@ def _run_fallback_agent(
     key_map = {
         "get_transaction_context": "transaction_context",
         "get_customer_profile": "customer_profile",
+        "get_customer_behavior": "customer_behavior",
         "get_customer_transaction_history": "transaction_history",
         "get_customer_risk_history": "risk_history",
         "get_similar_transactions": "similar_transactions",
@@ -188,6 +190,7 @@ After gathering sufficient evidence, provide your final investigation as JSON on
 Available investigation tools:
 - get_transaction_context
 - get_customer_profile
+- get_customer_behavior
 - get_customer_transaction_history
 - get_customer_risk_history
 - get_similar_transactions
@@ -240,7 +243,7 @@ Available investigation tools:
                 except json.JSONDecodeError:
                     args = {}
 
-                if tool_name in {"get_transaction_context", "get_similar_transactions"}:
+                if tool_name in {"get_transaction_context", "get_similar_transactions", "get_customer_behavior"}:
                     args.setdefault("transaction_id", transaction_id)
                 if "customer" in tool_name:
                     args.setdefault("customer_id", customer_id)

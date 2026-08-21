@@ -71,5 +71,6 @@
     "account_age_risk",
     "transaction_frequency_risk"
   ],
-  "model_type": "XGBoost"
+  "model_type": "XGBoost",
+  "decision_threshold": 0.25
 }

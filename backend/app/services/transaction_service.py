@@ -1,15 +1,18 @@
 """Application services for transactions, risk, and analytics."""
 
 import json
+import statistics
 from datetime import datetime
 from typing import Any
 
 from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import Session
 
-from app.models.db_models import ActionLog, Investigation, RiskAssessment, Transaction
+from app.models.db_models import ActionLog, Investigation, RiskAssessment, Transaction, UnblockRequest, Verification
 from app.schemas.schemas import (
     ActionResponse,
+    BehaviorSignal,
+    CustomerBehaviorResponse,
     CustomerProfile,
     InvestigationReport,
     InvestigationResponse,
@@ -19,6 +22,7 @@ from app.schemas.schemas import (
     RiskSummary,
     StatsResponse,
     ToolCallRecord,
+    TimelineEvent,
     TransactionDetail,
     TransactionSummary,
     TriggeredRule,
@@ -234,6 +238,219 @@ def get_customer_profile(db: Session, customer_id: str) -> CustomerProfile:
     )
 
 
+def get_customer_behavior(db: Session, transaction_id: str) -> CustomerBehaviorResponse:
+    """Compare a transaction with only that customer's earlier transactions."""
+    txn = db.query(Transaction).filter(Transaction.transaction_id == transaction_id).first()
+    if not txn:
+        raise ValueError(f"Transaction {transaction_id} not found")
+    history = (
+        db.query(Transaction)
+        .filter(
+            Transaction.customer_id == txn.customer_id,
+            Transaction.transaction_id != transaction_id,
+            or_(
+                Transaction.transaction_date < txn.transaction_date,
+                (Transaction.transaction_date == txn.transaction_date)
+                & (Transaction.transaction_time < txn.transaction_time),
+            ),
+        )
+        .order_by(desc(Transaction.transaction_date), desc(Transaction.transaction_time))
+        .limit(200)
+        .all()
+    )
+    if not history:
+        return CustomerBehaviorResponse(
+            transaction_id=transaction_id,
+            customer_id=txn.customer_id,
+            history_count=0,
+            amount_ratio_to_median=None,
+            is_new_country=True,
+            is_new_city=True,
+            is_new_device=True,
+            is_new_merchant_category=True,
+            signals=[BehaviorSignal(
+                label="Customer history",
+                current_value="First observed transaction",
+                baseline_value="No earlier activity",
+                impact="INCREASES_RISK",
+                explanation="No earlier customer activity is available to establish normal behavior.",
+            )],
+        )
+
+    median_amount = float(statistics.median(row.transaction_amount for row in history))
+    amount_ratio = txn.transaction_amount / max(median_amount, 1)
+    countries = {row.country for row in history}
+    cities = {row.city for row in history}
+    devices = {row.device_type for row in history}
+    categories = {row.merchant_category for row in history}
+    median_hour = float(statistics.median(row.hour_of_day for row in history))
+    is_new_country = txn.country not in countries
+    is_new_city = txn.city not in cities
+    is_new_device = txn.device_type not in devices
+    is_new_category = txn.merchant_category not in categories
+
+    signals = [BehaviorSignal(
+        label="Transaction amount",
+        current_value=f"₹{txn.transaction_amount:,.0f}",
+        baseline_value=f"₹{median_amount:,.0f} customer median",
+        impact="INCREASES_RISK" if amount_ratio >= 3 else "REDUCES_RISK",
+        explanation=(f"The amount is {amount_ratio:.1f}× the customer's earlier median." if amount_ratio >= 3
+                     else f"The amount is within {amount_ratio:.1f}× of the customer's earlier median."),
+    )]
+    for label, current, baseline, is_new in [
+        ("Country", txn.country, ", ".join(sorted(countries)[:3]), is_new_country),
+        ("City", txn.city, ", ".join(sorted(cities)[:3]), is_new_city),
+        ("Device type", txn.device_type, ", ".join(sorted(devices)), is_new_device),
+        ("Merchant category", txn.merchant_category, ", ".join(sorted(categories)[:3]), is_new_category),
+    ]:
+        signals.append(BehaviorSignal(
+            label=label,
+            current_value=current,
+            baseline_value=baseline or "No baseline",
+            impact="INCREASES_RISK" if is_new else "REDUCES_RISK",
+            explanation=f"{label} is {'new for this customer' if is_new else 'present in earlier customer activity'}.",
+        ))
+    unusual_hour = abs(txn.hour_of_day - median_hour) >= 6
+    signals.append(BehaviorSignal(
+        label="Transaction time",
+        current_value=f"{txn.hour_of_day:02d}:00",
+        baseline_value=f"Typical hour around {int(median_hour):02d}:00",
+        impact="INCREASES_RISK" if unusual_hour else "REDUCES_RISK",
+        explanation="The time differs substantially from earlier activity." if unusual_hour else "The time is consistent with earlier activity.",
+    ))
+    return CustomerBehaviorResponse(
+        transaction_id=transaction_id,
+        customer_id=txn.customer_id,
+        history_count=len(history),
+        amount_ratio_to_median=round(amount_ratio, 2),
+        is_new_country=is_new_country,
+        is_new_city=is_new_city,
+        is_new_device=is_new_device,
+        is_new_merchant_category=is_new_category,
+        signals=signals,
+    )
+
+
+def get_case_timeline(db: Session, transaction_id: str) -> list[TimelineEvent]:
+    txn = db.query(Transaction).filter(Transaction.transaction_id == transaction_id).first()
+    if not txn:
+        raise ValueError(f"Transaction {transaction_id} not found")
+    events = [TimelineEvent(event_type="TRANSACTION", title="Transaction received",
+        description=f"Payment of ₹{txn.transaction_amount:,.0f} was received for risk analysis.",
+        actor="Payment gateway", status="RECEIVED", timestamp=txn.created_at)]
+    for row in db.query(RiskAssessment).filter(RiskAssessment.transaction_id == transaction_id).all():
+        events.append(TimelineEvent(event_type="ASSESSMENT", title="Risk assessment completed",
+            description=f"Hybrid risk score {row.final_risk_score:.1f}/100 ({row.risk_level}).",
+            actor="ML model + rules", status=row.risk_level, timestamp=row.created_at))
+    for row in db.query(Investigation).filter(Investigation.transaction_id == transaction_id).all():
+        events.append(TimelineEvent(event_type="INVESTIGATION", title="AI investigation completed",
+            description=f"Recommended {row.recommended_action.replace('_', ' ').lower()} with {row.confidence:.0%} confidence.",
+            actor="AI Risk Investigator", status=row.recommended_action, timestamp=row.created_at))
+    for row in db.query(Verification).filter(Verification.transaction_id == transaction_id).all():
+        events.append(TimelineEvent(event_type="VERIFICATION", title=f"{row.method.replace('_', ' ').title()} requested",
+            description=row.notes or "Additional customer verification was requested.", actor=row.requested_by,
+            status="PENDING", timestamp=row.created_at))
+        if row.resolved_at:
+            events.append(TimelineEvent(event_type="VERIFICATION_RESULT", title=f"Verification {row.status.lower()}",
+                description=row.notes or f"Verification finished with status {row.status}.",
+                actor=row.resolved_by or "Demo Analyst", status=row.status, timestamp=row.resolved_at))
+    for row in db.query(UnblockRequest).filter(UnblockRequest.transaction_id == transaction_id).all():
+        events.append(TimelineEvent(event_type="UNBLOCK_REQUEST", title="Unblock review requested",
+            description=row.reason, actor=row.requested_by, status="PENDING", timestamp=row.created_at))
+        if row.reviewed_at:
+            events.append(TimelineEvent(event_type="UNBLOCK_REVIEW", title=f"Unblock request {row.status.lower()}",
+                description=row.review_notes or f"Senior review finished with status {row.status}.",
+                actor=row.reviewed_by or "Senior Demo Analyst", status=row.status, timestamp=row.reviewed_at))
+    for row in db.query(ActionLog).filter(ActionLog.transaction_id == transaction_id).all():
+        events.append(TimelineEvent(event_type="ACTION", title=row.action.replace("_", " ").title(),
+            description=f"Status changed from {row.previous_status} to {row.new_status}.",
+            actor="AI Risk Manager" if row.action.startswith(("AGENT_", "AUTO_")) else "Demo Analyst",
+            status=row.new_status, timestamp=row.created_at))
+    return sorted(events, key=lambda event: event.timestamp)
+
+
+def create_verification(db: Session, transaction_id: str, method: str, requested_by: str, notes: str | None) -> Verification:
+    txn = db.query(Transaction).filter(Transaction.transaction_id == transaction_id).first()
+    if not txn:
+        raise ValueError(f"Transaction {transaction_id} not found")
+    if txn.status in {"BLOCKED", "UNBLOCK_PENDING"}:
+        raise ValueError("Blocked transactions cannot enter verification. A separate authorized unblock review is required.")
+    previous = txn.status
+    row = Verification(transaction_id=transaction_id, method=method, requested_by=requested_by, notes=notes)
+    txn.status = "VERIFICATION_REQUIRED"
+    txn.action = "REQUIRE_VERIFICATION"
+    db.add(row)
+    db.add(ActionLog(transaction_id=transaction_id, action=f"REQUEST_{method}", previous_status=previous, new_status=txn.status))
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def resolve_verification(db: Session, verification_id: int, status: str, resolved_by: str, notes: str | None) -> Verification:
+    row = db.query(Verification).filter(Verification.id == verification_id).first()
+    if not row:
+        raise ValueError(f"Verification {verification_id} not found")
+    if row.status != "PENDING":
+        raise ValueError("Verification has already been resolved")
+    txn = db.query(Transaction).filter(Transaction.transaction_id == row.transaction_id).first()
+    if txn.status in {"BLOCKED", "UNBLOCK_PENDING"}:
+        raise ValueError("Verification cannot change a blocked transaction.")
+    previous = txn.status
+    status_map = {"PASSED": "VERIFIED", "FAILED": "HELD", "EXPIRED": "MANUAL_REVIEW", "CANCELLED": "ANALYZED"}
+    row.status, row.resolved_by, row.resolved_at = status, resolved_by, datetime.now()
+    if notes:
+        row.notes = notes
+    txn.status, txn.action = status_map[status], f"VERIFICATION_{status}"
+    db.add(ActionLog(transaction_id=txn.transaction_id, action=f"VERIFICATION_{status}", previous_status=previous, new_status=txn.status))
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def request_unblock(db: Session, transaction_id: str, reason: str, requested_by: str) -> UnblockRequest:
+    txn = db.query(Transaction).filter(Transaction.transaction_id == transaction_id).first()
+    if not txn:
+        raise ValueError(f"Transaction {transaction_id} not found")
+    if txn.status != "BLOCKED":
+        raise ValueError("Only blocked transactions can request an unblock review.")
+    pending = db.query(UnblockRequest).filter(
+        UnblockRequest.transaction_id == transaction_id,
+        UnblockRequest.status == "PENDING",
+    ).first()
+    if pending:
+        raise ValueError("An unblock review is already pending.")
+    row = UnblockRequest(transaction_id=transaction_id, reason=reason, requested_by=requested_by)
+    txn.status = "UNBLOCK_PENDING"
+    db.add(row)
+    db.add(ActionLog(transaction_id=transaction_id, action="UNBLOCK_REQUESTED", previous_status="BLOCKED", new_status="UNBLOCK_PENDING"))
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def review_unblock(db: Session, request_id: int, decision: str, reviewed_by: str, notes: str | None) -> UnblockRequest:
+    row = db.query(UnblockRequest).filter(UnblockRequest.id == request_id).first()
+    if not row:
+        raise ValueError(f"Unblock request {request_id} not found")
+    if row.status != "PENDING":
+        raise ValueError("Unblock request has already been reviewed.")
+    txn = db.query(Transaction).filter(Transaction.transaction_id == row.transaction_id).first()
+    if txn.status != "UNBLOCK_PENDING":
+        raise ValueError("Transaction is not awaiting unblock review.")
+    approved = decision == "APPROVE"
+    row.status = "APPROVED" if approved else "REJECTED"
+    row.reviewed_by = reviewed_by
+    row.review_notes = notes
+    row.reviewed_at = datetime.now()
+    new_status = "MANUAL_REVIEW" if approved else "BLOCKED"
+    txn.status = new_status
+    txn.action = "UNBLOCK_APPROVED" if approved else "UNBLOCK_REJECTED"
+    db.add(ActionLog(transaction_id=txn.transaction_id, action=txn.action, previous_status="UNBLOCK_PENDING", new_status=new_status))
+    db.commit()
+    db.refresh(row)
+    return row
+
+
 def get_stats(db: Session) -> StatsResponse:
     total = db.query(Transaction).count()
     analyzed = db.query(Transaction).filter(Transaction.risk_score.isnot(None)).count()
@@ -248,14 +465,14 @@ def get_stats(db: Session) -> StatsResponse:
         or 0
     )
 
-    fraud_rate = (fraud_count / total * 100) if total else 0
+    fraud_prevalence = (fraud_count / total * 100) if total else 0
 
     return StatsResponse(
         transactions_analyzed=analyzed,
         high_risk_transactions=high_risk,
         critical_transactions=critical,
         amount_at_risk=float(amount_at_risk),
-        fraud_detection_rate=round(fraud_rate, 2),
+        fraud_prevalence_rate=round(fraud_prevalence, 2),
         total_transactions=total,
         fraud_count=fraud_count,
     )
@@ -324,6 +541,22 @@ def get_model_metrics() -> ModelMetrics:
         confusion_matrix=m.get("confusion_matrix", [[0, 0], [0, 0]]),
         feature_count=len(ml_service.feature_names),
         trained_at=m.get("trained_at"),
+        threshold=m.get("threshold", 0.5),
+        false_positives=m.get("false_positives", 0),
+        false_negatives=m.get("false_negatives", 0),
+        true_positives=m.get("true_positives", 0),
+        true_negatives=m.get("true_negatives", 0),
+        alert_rate=m.get("alert_rate", 0),
+        estimated_total_cost_inr=m.get("estimated_total_cost_inr", 0),
+        false_positive_cost_inr=m.get("false_positive_cost_inr", 0),
+        false_negative_cost_inr=m.get("false_negative_cost_inr", 0),
+        validation_size=m.get("validation_size", 0),
+        test_size=m.get("test_size", 0),
+        split_strategy=m.get("split_strategy", "unknown"),
+        threshold_selected_on=m.get("threshold_selected_on", "unknown"),
+        cost_assumptions_inr=m.get("cost_assumptions_inr", {}),
+        validation_threshold_comparison=m.get("validation_threshold_comparison", []),
+        hybrid_test_metrics=m.get("hybrid_test_metrics", {}),
     )
 
 
@@ -331,6 +564,8 @@ def apply_action(db: Session, transaction_id: str, action: str) -> ActionRespons
     txn = db.query(Transaction).filter(Transaction.transaction_id == transaction_id).first()
     if not txn:
         raise ValueError(f"Transaction {transaction_id} not found")
+    if txn.status in {"BLOCKED", "UNBLOCK_PENDING"} and action.upper() != "BLOCK":
+        raise ValueError("Blocked transactions are terminal. A separate authorized unblock review is required.")
 
     status_map = {
         "APPROVE": "APPROVED",
@@ -369,6 +604,8 @@ def apply_agent_recommendation(db: Session, transaction_id: str, recommendation:
     txn = db.query(Transaction).filter(Transaction.transaction_id == transaction_id).first()
     if not txn:
         raise ValueError(f"Transaction {transaction_id} not found")
+    if txn.status in {"BLOCKED", "UNBLOCK_PENDING"}:
+        return "BLOCK_RETAINED", "BLOCKED", True
 
     recommendation = recommendation.upper()
     status_map = {

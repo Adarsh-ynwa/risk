@@ -50,6 +50,11 @@ def run_langgraph_investigation(
         return execute_tool(db, "get_customer_profile", {"customer_id": customer_id_arg})
 
     @tool
+    def get_customer_behavior(transaction_id_arg: str = transaction_id) -> dict[str, Any]:
+        """Compare this payment with the customer's earlier behavior and explain unusual or familiar signals."""
+        return execute_tool(db, "get_customer_behavior", {"transaction_id": transaction_id_arg})
+
+    @tool
     def get_customer_transaction_history(customer_id_arg: str = customer_id, limit: int = 10) -> list[dict[str, Any]]:
         """Get a customer's recent payment history to identify unusual behaviour."""
         return execute_tool(db, "get_customer_transaction_history", {"customer_id": customer_id_arg, "limit": limit})
@@ -67,6 +72,7 @@ def run_langgraph_investigation(
     tools = [
         get_transaction_context,
         get_customer_profile,
+        get_customer_behavior,
         get_customer_transaction_history,
         get_customer_risk_history,
         get_similar_transactions,

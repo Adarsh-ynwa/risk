@@ -84,3 +84,31 @@ class ActionLog(Base):
     previous_status: Mapped[str] = mapped_column(String(32))
     new_status: Mapped[str] = mapped_column(String(32))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Verification(Base):
+    __tablename__ = "verifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    transaction_id: Mapped[str] = mapped_column(String(64), index=True)
+    method: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(24), default="PENDING", index=True)
+    requested_by: Mapped[str] = mapped_column(String(64), default="AI Risk Manager")
+    resolved_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class UnblockRequest(Base):
+    __tablename__ = "unblock_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    transaction_id: Mapped[str] = mapped_column(String(64), index=True)
+    reason: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(24), default="PENDING", index=True)
+    requested_by: Mapped[str] = mapped_column(String(64), default="Demo Analyst")
+    reviewed_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    review_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

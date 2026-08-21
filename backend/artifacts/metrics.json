@@ -1,21 +1,159 @@
 {
-  "precision": 0.10026885971848806,
-  "recall": 0.5784671532846716,
-  "f1": 0.17091252190322145,
-  "roc_auc": 0.70454792375846,
-  "pr_auc": 0.11247277165514935,
+  "threshold": 0.25,
+  "precision": 0.07549079133778587,
+  "recall": 0.9249845009299442,
+  "f1": 0.13958927819619216,
   "confusion_matrix": [
     [
-      26430,
-      11378
+      10115,
+      18272
     ],
     [
-      924,
-      1268
+      121,
+      1492
     ]
   ],
-  "trained_at": "2026-08-21T04:30:58.809278",
-  "train_size": 160000,
-  "test_size": 40000,
-  "fraud_rate": 0.0548
+  "true_negatives": 10115,
+  "false_positives": 18272,
+  "false_negatives": 121,
+  "true_positives": 1492,
+  "alert_rate": 0.6588,
+  "false_positive_cost_inr": 3654400.0,
+  "false_negative_cost_inr": 665500.0,
+  "estimated_total_cost_inr": 4319900.0,
+  "roc_auc": 0.7037454340614294,
+  "pr_auc": 0.11502339356670746,
+  "trained_at": "2026-08-21T15:44:53.768285+00:00",
+  "train_size": 140000,
+  "validation_size": 30000,
+  "test_size": 30000,
+  "fraud_rate": 0.0548,
+  "split_strategy": "chronological_70_15_15",
+  "threshold_selected_on": "validation_set_only",
+  "cost_assumptions_inr": {
+    "false_positive": 200.0,
+    "false_negative": 5500.0
+  },
+  "validation_threshold_comparison": [
+    {
+      "threshold": 0.25,
+      "precision": 0.07711757269279393,
+      "recall": 0.9253640776699029,
+      "f1": 0.14237034962423564,
+      "confusion_matrix": [
+        [
+          10102,
+          18250
+        ],
+        [
+          123,
+          1525
+        ]
+      ],
+      "true_negatives": 10102,
+      "false_positives": 18250,
+      "false_negatives": 123,
+      "true_positives": 1525,
+      "alert_rate": 0.6591666666666667,
+      "false_positive_cost_inr": 3650000.0,
+      "false_negative_cost_inr": 676500.0,
+      "estimated_total_cost_inr": 4326500.0
+    },
+    {
+      "threshold": 0.3,
+      "precision": 0.07735634559735428,
+      "recall": 0.908373786407767,
+      "f1": 0.14257142857142857,
+      "confusion_matrix": [
+        [
+          10497,
+          17855
+        ],
+        [
+          151,
+          1497
+        ]
+      ],
+      "true_negatives": 10497,
+      "false_positives": 17855,
+      "false_negatives": 151,
+      "true_positives": 1497,
+      "alert_rate": 0.6450666666666667,
+      "false_positive_cost_inr": 3571000.0,
+      "false_negative_cost_inr": 830500.0,
+      "estimated_total_cost_inr": 4401500.0
+    },
+    {
+      "threshold": 0.5,
+      "precision": 0.1016787080322992,
+      "recall": 0.5807038834951457,
+      "f1": 0.17305605786618444,
+      "confusion_matrix": [
+        [
+          19897,
+          8455
+        ],
+        [
+          691,
+          957
+        ]
+      ],
+      "true_negatives": 19897,
+      "false_positives": 8455,
+      "false_negatives": 691,
+      "true_positives": 957,
+      "alert_rate": 0.3137333333333333,
+      "false_positive_cost_inr": 1691000.0,
+      "false_negative_cost_inr": 3800500.0,
+      "estimated_total_cost_inr": 5491500.0
+    },
+    {
+      "threshold": 0.7,
+      "precision": 0.15292779988629904,
+      "recall": 0.16322815533980584,
+      "f1": 0.15791018491341355,
+      "confusion_matrix": [
+        [
+          26862,
+          1490
+        ],
+        [
+          1379,
+          269
+        ]
+      ],
+      "true_negatives": 26862,
+      "false_positives": 1490,
+      "false_negatives": 1379,
+      "true_positives": 269,
+      "alert_rate": 0.058633333333333336,
+      "false_positive_cost_inr": 298000.0,
+      "false_negative_cost_inr": 7584500.0,
+      "estimated_total_cost_inr": 7882500.0
+    }
+  ],
+  "hybrid_test_metrics": {
+    "threshold": 0.6,
+    "precision": 0.17834394904458598,
+    "recall": 0.01735895846249225,
+    "f1": 0.031638418079096044,
+    "confusion_matrix": [
+      [
+        28258,
+        129
+      ],
+      [
+        1585,
+        28
+      ]
+    ],
+    "true_negatives": 28258,
+    "false_positives": 129,
+    "false_negatives": 1585,
+    "true_positives": 28,
+    "alert_rate": 0.005233333333333334,
+    "false_positive_cost_inr": 25800.0,
+    "false_negative_cost_inr": 8717500.0,
+    "estimated_total_cost_inr": 8743300.0
+  }
 }

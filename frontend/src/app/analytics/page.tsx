@@ -36,7 +36,7 @@ export default async function AnalyticsPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard title="Total Transactions" value={stats.total_transactions.toLocaleString()} icon={BarChart3} />
-        <KpiCard title="Fraud Rate" value={`${stats.fraud_detection_rate}%`} icon={BarChart3} accent="bg-red-500/10 text-red-400" />
+        <KpiCard title="Observed Fraud Rate" value={`${stats.fraud_prevalence_rate}%`} icon={BarChart3} accent="bg-red-500/10 text-red-400" />
         <KpiCard title="Amount at Risk" value={formatCurrency(stats.amount_at_risk)} icon={BarChart3} accent="bg-amber-500/10 text-amber-400" />
         <KpiCard title="Critical Cases" value={stats.critical_transactions} icon={BarChart3} accent="bg-orange-500/10 text-orange-400" />
       </div>

@@ -27,6 +27,8 @@ python scripts/train_model.py
 python scripts/load_data.py
 ```
 
+The training step excludes demo-only records, selects a cost-sensitive threshold on a chronological validation set, and writes untouched held-out metrics to `artifacts/metrics.json`.
+
 ### 2. Start backend
 
 ```powershell

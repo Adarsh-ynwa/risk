@@ -34,7 +34,10 @@ def compute_risk(
     # actionable even when the statistical model has low confidence. This is
     # common in payment-risk systems, where hard rules protect against novel
     # fraud patterns that were underrepresented in model training data.
-    rule_floor = rule_score if rule_score >= 80 else 0
+    # Preserve a safety floor for dense rule matches without forcing every
+    # strongly suspicious payment to 100. A perfect rule score establishes a
+    # 92-point floor; the ML evidence can still move the final score higher.
+    rule_floor = 80 + (rule_score - 80) * 0.60 if rule_score >= 80 else 0
     final_risk_score = min(max(weighted_score, rule_floor, 0), 100)
     risk_level = score_to_level(final_risk_score)
 

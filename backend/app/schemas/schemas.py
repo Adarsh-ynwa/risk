@@ -107,6 +107,82 @@ class ActionResponse(BaseModel):
     timestamp: datetime
 
 
+class VerificationRequest(BaseModel):
+    method: str = Field(pattern="^(OTP|REGISTERED_DEVICE|IDENTITY_CHECK|CALLBACK|MANUAL_REVIEW)$")
+    requested_by: str = Field(default="AI Risk Manager", min_length=1, max_length=64)
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class VerificationUpdate(BaseModel):
+    status: str = Field(pattern="^(PASSED|FAILED|EXPIRED|CANCELLED)$")
+    resolved_by: str = Field(default="Demo Analyst", min_length=1, max_length=64)
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class VerificationResponse(BaseModel):
+    id: int
+    transaction_id: str
+    method: str
+    status: str
+    requested_by: str
+    resolved_by: str | None
+    notes: str | None
+    created_at: datetime
+    resolved_at: datetime | None
+
+
+class UnblockRequestCreate(BaseModel):
+    reason: str = Field(min_length=10, max_length=500)
+    requested_by: str = Field(default="Demo Analyst", min_length=1, max_length=64)
+
+
+class UnblockReviewRequest(BaseModel):
+    decision: str = Field(pattern="^(APPROVE|REJECT)$")
+    reviewed_by: str = Field(default="Senior Demo Analyst", min_length=1, max_length=64)
+    notes: str | None = Field(default=None, max_length=500)
+
+
+class UnblockRequestResponse(BaseModel):
+    id: int
+    transaction_id: str
+    reason: str
+    status: str
+    requested_by: str
+    reviewed_by: str | None
+    review_notes: str | None
+    created_at: datetime
+    reviewed_at: datetime | None
+
+
+class BehaviorSignal(BaseModel):
+    label: str
+    current_value: str
+    baseline_value: str
+    impact: str
+    explanation: str
+
+
+class CustomerBehaviorResponse(BaseModel):
+    transaction_id: str
+    customer_id: str
+    history_count: int
+    amount_ratio_to_median: float | None
+    is_new_country: bool
+    is_new_city: bool
+    is_new_device: bool
+    is_new_merchant_category: bool
+    signals: list[BehaviorSignal] = Field(default_factory=list)
+
+
+class TimelineEvent(BaseModel):
+    event_type: str
+    title: str
+    description: str
+    actor: str
+    status: str | None = None
+    timestamp: datetime
+
+
 class TransactionSummary(BaseModel):
     transaction_id: str
     customer_id: str
@@ -183,7 +259,7 @@ class StatsResponse(BaseModel):
     high_risk_transactions: int
     critical_transactions: int
     amount_at_risk: float
-    fraud_detection_rate: float
+    fraud_prevalence_rate: float
     total_transactions: int
     fraud_count: int
 
@@ -205,6 +281,22 @@ class ModelMetrics(BaseModel):
     confusion_matrix: list[list[int]]
     feature_count: int
     trained_at: str | None
+    threshold: float = 0.5
+    false_positives: int = 0
+    false_negatives: int = 0
+    true_positives: int = 0
+    true_negatives: int = 0
+    alert_rate: float = 0
+    estimated_total_cost_inr: float = 0
+    false_positive_cost_inr: float = 0
+    false_negative_cost_inr: float = 0
+    validation_size: int = 0
+    test_size: int = 0
+    split_strategy: str = "unknown"
+    threshold_selected_on: str = "unknown"
+    cost_assumptions_inr: dict[str, float] = Field(default_factory=dict)
+    validation_threshold_comparison: list[dict[str, Any]] = Field(default_factory=list)
+    hybrid_test_metrics: dict[str, Any] = Field(default_factory=dict)
 
 
 class RiskSummary(BaseModel):

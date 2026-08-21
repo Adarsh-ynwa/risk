@@ -37,7 +37,7 @@ export default async function DashboardPage() {
         <KpiCard title="High Risk" value={stats.high_risk_transactions.toLocaleString()} icon={AlertTriangle} accent="bg-orange-500/10 text-orange-400" />
         <KpiCard title="Critical" value={stats.critical_transactions.toLocaleString()} icon={Shield} accent="bg-red-500/10 text-red-400" />
         <KpiCard title="Amount at Risk" value={formatCurrency(stats.amount_at_risk)} icon={Wallet} accent="bg-amber-500/10 text-amber-400" />
-        <KpiCard title="Fraud Detection Rate" value={`${stats.fraud_detection_rate}%`} subtitle={`${stats.fraud_count} of ${stats.total_transactions}`} icon={TrendingUp} />
+        <KpiCard title="Observed Fraud Rate" value={`${stats.fraud_prevalence_rate}%`} subtitle={`${stats.fraud_count} labeled fraud of ${stats.total_transactions}`} icon={TrendingUp} />
       </div>
 
       <DashboardCharts summary={summary} />

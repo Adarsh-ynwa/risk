@@ -23,7 +23,7 @@ pip install -r requirements.txt
 
 if (-not (Test-Path ".env")) {
     Copy-Item ".env.example" ".env"
-    Write-Host "Created .env from .env.example — add GEMINI_API_KEY if you have one."
+    Write-Host "Created .env from .env.example — add GROQ_API_KEY if you have one."
 }
 
 if (-not $UseKaggle) {

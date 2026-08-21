@@ -74,7 +74,7 @@ export default function NewTransactionPage() {
           <ArrowLeft className="h-4 w-4" />Back to transactions
         </Button>
         <h1 className="text-3xl font-bold">Add a new transaction</h1>
-        <p className="text-muted-foreground">Submitting this payment saves it and automatically runs the risk model.</p>
+        <p className="text-muted-foreground">Submitting this payment automatically creates a unique transaction ID, saves it, and runs the risk model.</p>
       </div>
 
       <form onSubmit={submit} className="space-y-6 rounded-xl border bg-card p-5 shadow-sm">

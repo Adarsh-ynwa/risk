@@ -15,10 +15,11 @@ from app.agent.investigator import run_investigation
 from app.agent.tools import get_filter_options, get_fraud_probability_distribution
 from app.config import settings
 from app.database import Base, engine, get_db
-from app.models.db_models import ActionLog, Investigation, RiskAssessment, Transaction
+from app.models.db_models import ActionLog, Investigation, RiskAssessment, Transaction, UnblockRequest, Verification
 from app.schemas.schemas import (
     ActionRequest,
     ActionResponse,
+    CustomerBehaviorResponse,
     HealthResponse,
     InvestigationResponse,
     ModelMetrics,
@@ -29,12 +30,22 @@ from app.schemas.schemas import (
     StatsResponse,
     TransactionCreateRequest,
     TransactionDetail,
+    TimelineEvent,
+    UnblockRequestCreate,
+    UnblockRequestResponse,
+    UnblockReviewRequest,
+    VerificationRequest,
+    VerificationResponse,
+    VerificationUpdate,
 )
 from app.services.ml_service import ml_service
 from app.services.transaction_service import (
     analyze_transaction,
     apply_agent_recommendation,
     apply_action,
+    create_verification,
+    get_case_timeline,
+    get_customer_behavior,
     get_customer_profile,
     get_highest_risk_transaction_id,
     get_investigation,
@@ -45,10 +56,23 @@ from app.services.transaction_service import (
     get_transaction_detail,
     list_transactions,
     save_investigation,
+    resolve_verification,
+    request_unblock,
+    review_unblock,
 )
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _new_transaction_id(db: Session) -> str:
+    """Generate a human-readable unique ID without accepting one from clients."""
+    for _ in range(10):
+        candidate = f"TXN-{uuid4().hex[:12].upper()}"
+        exists = db.query(Transaction.id).filter(Transaction.transaction_id == candidate).first()
+        if not exists:
+            return candidate
+    raise RuntimeError("Could not generate a unique transaction ID")
 
 
 @asynccontextmanager
@@ -142,7 +166,7 @@ def create_transaction(body: TransactionCreateRequest, db: Session = Depends(get
     """Persist an incoming payment, then score it immediately."""
     now = datetime.now()
     txn = Transaction(
-        transaction_id=f"TXN-{uuid4().hex[:12].upper()}",
+        transaction_id=_new_transaction_id(db),
         customer_id=body.customer_id.strip(),
         transaction_date=now.date().isoformat(),
         transaction_time=now.strftime("%H:%M:%S"),
@@ -180,6 +204,97 @@ def get_transaction(transaction_id: str, db: Session = Depends(get_db)):
         return get_transaction_detail(db, transaction_id)
     except ValueError as e:
         raise HTTPException(404, str(e))
+
+
+@app.get("/transactions/{transaction_id}/behavior", response_model=CustomerBehaviorResponse)
+def transaction_behavior(transaction_id: str, db: Session = Depends(get_db)):
+    try:
+        return get_customer_behavior(db, transaction_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+@app.get("/cases/{transaction_id}/timeline", response_model=list[TimelineEvent])
+def case_timeline(transaction_id: str, db: Session = Depends(get_db)):
+    try:
+        return get_case_timeline(db, transaction_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+def _verification_response(row) -> VerificationResponse:
+    return VerificationResponse(
+        id=row.id,
+        transaction_id=row.transaction_id,
+        method=row.method,
+        status=row.status,
+        requested_by=row.requested_by,
+        resolved_by=row.resolved_by,
+        notes=row.notes,
+        created_at=row.created_at,
+        resolved_at=row.resolved_at,
+    )
+
+
+@app.post("/verifications/{transaction_id}", response_model=VerificationResponse, status_code=201)
+def request_verification(transaction_id: str, body: VerificationRequest, db: Session = Depends(get_db)):
+    try:
+        return _verification_response(create_verification(
+            db, transaction_id, body.method, body.requested_by, body.notes
+        ))
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+@app.get("/verifications/transaction/{transaction_id}", response_model=list[VerificationResponse])
+def list_transaction_verifications(transaction_id: str, db: Session = Depends(get_db)):
+    rows = (
+        db.query(Verification)
+        .filter(Verification.transaction_id == transaction_id)
+        .order_by(Verification.created_at.desc())
+        .all()
+    )
+    return [_verification_response(row) for row in rows]
+
+
+@app.patch("/verifications/{verification_id}", response_model=VerificationResponse)
+def update_verification(verification_id: int, body: VerificationUpdate, db: Session = Depends(get_db)):
+    try:
+        return _verification_response(resolve_verification(
+            db, verification_id, body.status, body.resolved_by, body.notes
+        ))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+def _unblock_response(row: UnblockRequest) -> UnblockRequestResponse:
+    return UnblockRequestResponse(
+        id=row.id, transaction_id=row.transaction_id, reason=row.reason, status=row.status,
+        requested_by=row.requested_by, reviewed_by=row.reviewed_by, review_notes=row.review_notes,
+        created_at=row.created_at, reviewed_at=row.reviewed_at,
+    )
+
+
+@app.post("/unblock-requests/{transaction_id}", response_model=UnblockRequestResponse, status_code=201)
+def create_unblock_request(transaction_id: str, body: UnblockRequestCreate, db: Session = Depends(get_db)):
+    try:
+        return _unblock_response(request_unblock(db, transaction_id, body.reason, body.requested_by))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/unblock-requests/transaction/{transaction_id}", response_model=list[UnblockRequestResponse])
+def list_unblock_requests(transaction_id: str, db: Session = Depends(get_db)):
+    rows = db.query(UnblockRequest).filter(UnblockRequest.transaction_id == transaction_id).order_by(UnblockRequest.created_at.desc()).all()
+    return [_unblock_response(row) for row in rows]
+
+
+@app.patch("/unblock-requests/{request_id}", response_model=UnblockRequestResponse)
+def decide_unblock_request(request_id: int, body: UnblockReviewRequest, db: Session = Depends(get_db)):
+    try:
+        return _unblock_response(review_unblock(db, request_id, body.decision, body.reviewed_by, body.notes))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.get("/customers/{customer_id}")
@@ -261,7 +376,7 @@ def create_action(transaction_id: str, body: ActionRequest, db: Session = Depend
     try:
         return apply_action(db, transaction_id, body.action.value)
     except ValueError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(400, str(e))
 
 
 @app.get("/actions")
@@ -316,3 +431,6 @@ def analytics(db: Session = Depends(get_db)):
         "failed_attempt_fraud_count": failed_corr,
         "fraud_probability_distribution": get_fraud_probability_distribution(db),
     }
+    create_verification,
+    get_case_timeline,
+    get_customer_behavior,

@@ -7,7 +7,7 @@ from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
 from app.models.db_models import RiskAssessment, Transaction
-from app.services.transaction_service import get_customer_profile, transaction_to_dict
+from app.services.transaction_service import get_customer_behavior, get_customer_profile, transaction_to_dict
 
 
 def get_customer_profile_tool(db: Session, customer_id: str) -> dict[str, Any]:
@@ -44,6 +44,10 @@ def get_transaction_context_tool(db: Session, transaction_id: str) -> dict[str, 
     if not txn:
         return {"error": f"Transaction {transaction_id} not found"}
     return transaction_to_dict(txn)
+
+
+def get_customer_behavior_tool(db: Session, transaction_id: str) -> dict[str, Any]:
+    return get_customer_behavior(db, transaction_id).model_dump()
 
 
 def get_customer_risk_history(db: Session, customer_id: str, limit: int = 10) -> list[dict[str, Any]]:
@@ -141,6 +145,15 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "get_customer_behavior",
+        "description": "Compare the transaction with the customer's earlier behavior and return risk-increasing and risk-reducing evidence.",
+        "parameters": {
+            "type": "object",
+            "properties": {"transaction_id": {"type": "string", "description": "Transaction ID to compare"}},
+            "required": ["transaction_id"],
+        },
+    },
+    {
         "name": "get_customer_profile",
         "description": "Get customer profile: age, credit score, account age, balance, transaction frequency, prior transaction count.",
         "parameters": {
@@ -198,6 +211,7 @@ def execute_tool(db: Session, tool_name: str, args: dict[str, Any]) -> Any:
             db, args["customer_id"], args.get("limit", 10)
         ),
         "get_transaction_context": lambda: get_transaction_context_tool(db, args["transaction_id"]),
+        "get_customer_behavior": lambda: get_customer_behavior_tool(db, args["transaction_id"]),
         "get_customer_risk_history": lambda: get_customer_risk_history(
             db, args["customer_id"], args.get("limit", 10)
         ),

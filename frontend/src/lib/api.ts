@@ -21,7 +21,7 @@ export interface Stats {
   high_risk_transactions: number;
   critical_transactions: number;
   amount_at_risk: number;
-  fraud_detection_rate: number;
+  fraud_prevalence_rate: number;
   total_transactions: number;
   fraud_count: number;
 }
@@ -144,6 +144,97 @@ export interface FraudProbBucket {
   count: number;
 }
 
+export interface ModelMetrics {
+  model_type: string;
+  precision: number;
+  recall: number;
+  f1: number;
+  roc_auc: number;
+  pr_auc: number | null;
+  confusion_matrix: number[][];
+  threshold: number;
+  false_positives: number;
+  false_negatives: number;
+  true_positives: number;
+  true_negatives: number;
+  alert_rate: number;
+  estimated_total_cost_inr: number;
+  false_positive_cost_inr: number;
+  false_negative_cost_inr: number;
+  validation_size: number;
+  test_size: number;
+  split_strategy: string;
+  cost_assumptions_inr: Record<string, number>;
+  validation_threshold_comparison: ThresholdMetrics[];
+  hybrid_test_metrics: ThresholdMetrics;
+}
+
+export interface ThresholdMetrics {
+  threshold: number;
+  precision: number;
+  recall: number;
+  f1: number;
+  false_positives: number;
+  false_negatives: number;
+  true_positives: number;
+  true_negatives: number;
+  alert_rate: number;
+  estimated_total_cost_inr: number;
+}
+
+export interface BehaviorSignal {
+  label: string;
+  current_value: string;
+  baseline_value: string;
+  impact: "INCREASES_RISK" | "REDUCES_RISK";
+  explanation: string;
+}
+
+export interface CustomerBehavior {
+  transaction_id: string;
+  customer_id: string;
+  history_count: number;
+  amount_ratio_to_median: number | null;
+  is_new_country: boolean;
+  is_new_city: boolean;
+  is_new_device: boolean;
+  is_new_merchant_category: boolean;
+  signals: BehaviorSignal[];
+}
+
+export interface TimelineEvent {
+  event_type: string;
+  title: string;
+  description: string;
+  actor: string;
+  status: string | null;
+  timestamp: string;
+}
+
+export interface Verification {
+  id: number;
+  transaction_id: string;
+  method: string;
+  status: string;
+  requested_by: string;
+  resolved_by: string | null;
+  notes: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface UnblockRequest {
+  id: number;
+  transaction_id: string;
+  reason: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  requested_by: string;
+  reviewed_by: string | null;
+  review_notes: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
 export interface AnalyticsData {
   stats: Stats;
   risk_summary: RiskSummary;
@@ -209,5 +300,29 @@ export const api = {
     }),
   riskSummary: () => fetchApi<RiskSummary>("/risk/summary"),
   analytics: () => fetchApi<AnalyticsData>("/analytics"),
-  modelMetrics: () => fetchApi<Record<string, unknown>>("/model/metrics"),
+  modelMetrics: () => fetchApi<ModelMetrics>("/model/metrics"),
+  behavior: (transaction_id: string) => fetchApi<CustomerBehavior>(`/transactions/${transaction_id}/behavior`),
+  timeline: (transaction_id: string) => fetchApi<TimelineEvent[]>(`/cases/${transaction_id}/timeline`),
+  requestVerification: (transaction_id: string, method: string) =>
+    fetchApi<Verification>(`/verifications/${transaction_id}`, {
+      method: "POST",
+      body: JSON.stringify({ method, requested_by: "Demo Analyst" }),
+    }),
+  verifications: (transaction_id: string) => fetchApi<Verification[]>(`/verifications/transaction/${transaction_id}`),
+  resolveVerification: (verification_id: number, status: string) =>
+    fetchApi<Verification>(`/verifications/${verification_id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, resolved_by: "Demo Analyst" }),
+    }),
+  unblockRequests: (transaction_id: string) => fetchApi<UnblockRequest[]>(`/unblock-requests/transaction/${transaction_id}`),
+  requestUnblock: (transaction_id: string, reason: string) =>
+    fetchApi<UnblockRequest>(`/unblock-requests/${transaction_id}`, {
+      method: "POST",
+      body: JSON.stringify({ reason, requested_by: "Demo Analyst" }),
+    }),
+  reviewUnblock: (request_id: number, decision: "APPROVE" | "REJECT") =>
+    fetchApi<UnblockRequest>(`/unblock-requests/${request_id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ decision, reviewed_by: "Senior Demo Analyst" }),
+    }),
 };

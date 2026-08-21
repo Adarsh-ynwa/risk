@@ -1,9 +1,9 @@
 import { Settings, Shield, Bot, Database, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { api } from "@/lib/api";
+import { api, type ModelMetrics, type ThresholdMetrics } from "@/lib/api";
 
 export default async function SettingsPage() {
-  let metrics: Record<string, unknown> = {};
+  let metrics: Partial<ModelMetrics> = {};
   let health: { model_loaded: boolean; groq_configured: boolean } = { model_loaded: false, groq_configured: false };
 
   try {
@@ -11,6 +11,7 @@ export default async function SettingsPage() {
   } catch {
     /* use defaults */
   }
+  const hybrid: Partial<ThresholdMetrics> = metrics.hybrid_test_metrics ?? {};
 
   const thresholds = [
     { level: "LOW", range: "0 – 29", color: "text-risk-low" },
@@ -61,13 +62,26 @@ export default async function SettingsPage() {
           <Row label="Database" value="SQLite" status="Local" />
           {metrics.f1 != null && (
             <div className="pt-2 border-t border-border">
-              <p className="text-xs text-muted-foreground mb-2">Model Metrics (test set)</p>
+              <p className="text-xs text-muted-foreground mb-2">Held-out Model Metrics</p>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <span>F1: {Number(metrics.f1).toFixed(3)}</span>
                 <span>ROC-AUC: {Number(metrics.roc_auc).toFixed(3)}</span>
                 <span>Precision: {Number(metrics.precision).toFixed(3)}</span>
                 <span>Recall: {Number(metrics.recall).toFixed(3)}</span>
+                <span>Threshold: {Number(metrics.threshold ?? 0.5).toFixed(2)}</span>
+                <span>Test rows: {Number(metrics.test_size ?? 0).toLocaleString()}</span>
+                <span>False positives: {Number(metrics.false_positives ?? 0).toLocaleString()}</span>
+                <span>False negatives: {Number(metrics.false_negatives ?? 0).toLocaleString()}</span>
               </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Threshold selected on validation data using an illustrative false-positive/false-negative cost model.
+                Estimated held-out cost: ₹{Number(metrics.estimated_total_cost_inr ?? 0).toLocaleString("en-IN")}.
+              </p>
+              {hybrid.precision != null && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Deployed ML + rules at the HIGH-risk boundary — precision: {Number(hybrid.precision).toFixed(3)}, recall: {Number(hybrid.recall).toFixed(3)}, false positives: {Number(hybrid.false_positives).toLocaleString()}.
+                </p>
+              )}
             </div>
           )}
         </CardContent>

@@ -1,6 +1,7 @@
 """Append labeled high-risk demo payments to the training CSV and local SQLite database."""
 
 import argparse
+import random
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -18,35 +19,40 @@ CSV_PATH = BACKEND_DIR / "data" / "bank_fraud.csv"
 
 
 def make_row(number: int) -> dict:
-    """Create a labeled synthetic account-takeover payment for model training."""
+    """Create a varied synthetic account-takeover payment for demos."""
     now = datetime.now()
-    critical = number % 2 == 0
-    balance = 75_000 if critical else 45_000
+    rng = random.Random(number * 7919)
+    balance = round(rng.uniform(35_000, 140_000), 2)
+    amount = round(balance * rng.uniform(0.18, 0.88), 2)
+    international = rng.random() < 0.46
+    night = rng.random() < 0.52
+    hour = rng.choice([0, 1, 2, 3, 4, 22, 23]) if night else rng.randint(7, 21)
+    distance = round(rng.uniform(20, 750), 2)
     return {
         "transaction_id": f"DEMOHR{uuid4().hex[:14].upper()}",
         "customer_id": f"DEMO-HIGH-RISK-{number:05d}",
         "transaction_date": now.date().isoformat(),
-        "transaction_time": "02:15:00" if critical else "03:40:00",
-        "hour_of_day": 2 if critical else 3,
-        "is_weekend": 1,
-        "is_night_transaction": 1,
-        "country": "India",
-        "city": "Mumbai",
-        "merchant_category": "Crypto Exchange" if critical else "Online Shopping",
-        "payment_method": "Bank Transfer",
-        "device_type": "Mobile",
-        "customer_age": 23,
-        "credit_score": 480,
-        "account_age_years": 0.4 if critical else 0.8,
+        "transaction_time": f"{hour:02d}:{rng.randint(0, 59):02d}:00",
+        "hour_of_day": hour,
+        "is_weekend": int(rng.random() < 0.45),
+        "is_night_transaction": int(night),
+        "country": rng.choice(["UAE", "Singapore", "UK", "USA"]) if international else "India",
+        "city": rng.choice(["Dubai", "Singapore", "London", "New York"]) if international else rng.choice(["Mumbai", "Delhi", "Bangalore"]),
+        "merchant_category": rng.choice(["Crypto Exchange", "Electronics", "Travel", "Online Services"]),
+        "payment_method": rng.choice(["Bank Transfer", "Credit Card", "Wallet", "UPI"]),
+        "device_type": rng.choice(["Mobile", "Desktop", "Tablet"]),
+        "customer_age": rng.randint(20, 61),
+        "credit_score": rng.randint(410, 710),
+        "account_age_years": round(rng.uniform(0.3, 5), 2),
         "account_balance": balance,
-        "transaction_amount": 68_000 if critical else 30_000,
-        "num_prev_transactions": 8,
-        "transaction_freq_monthly": 75 if critical else 45,
-        "distance_from_home_km": 850 if critical else 320,
-        "time_since_last_txn_hrs": 0.03,
-        "is_international": 1,
-        "failed_attempts": 6 if critical else 3,
-        "pin_changed_recently": 1,
+        "transaction_amount": amount,
+        "num_prev_transactions": rng.randint(3, 80),
+        "transaction_freq_monthly": round(rng.uniform(8, 58), 2),
+        "distance_from_home_km": distance,
+        "time_since_last_txn_hrs": round(rng.uniform(0.03, 8), 2),
+        "is_international": int(international),
+        "failed_attempts": rng.randint(0, 5),
+        "pin_changed_recently": int(rng.random() < 0.40),
         "is_fraud": 1,
         "fraud_type": "Synthetic account takeover",
     }
